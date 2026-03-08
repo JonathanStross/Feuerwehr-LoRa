@@ -440,7 +440,17 @@ def on_receive(packet, interface):
     if VERBOSE:
         ch_index_v = packet.get("channel") or 0
         ch_name = CHANNEL_MAP.get(ch_index_v, f"index={ch_index_v}")
-        print(f"[verbose] portnum={portnum} | channel={ch_index_v} ({ch_name}) | from={sender_id_v} | matched={channel_matches(packet)}")
+        rssi_v = safe_get(packet, "rxRssi", "rx_rssi")
+        snr_v = safe_get(packet, "rxSnr", "rx_snr")
+        hops_v = compute_hops(packet)
+        text_v = decoded.get("text")
+        matched_v = channel_matches(packet)
+        print(
+            f"[verbose] portnum={portnum} | channel={ch_index_v} ({ch_name}) | "
+            f"from={sender_id_v} | matched={matched_v} | "
+            f"rssi={rssi_v} | snr={snr_v} | hops={hops_v}"
+            + (f" | text={text_v!r}" if text_v is not None else "")
+        )
 
     # Positionscache
     if portnum == "POSITION_APP":
