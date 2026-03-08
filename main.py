@@ -115,16 +115,21 @@ def safe_get(d: dict, *keys, default=None):
 def get_channel_map(interface) -> dict:
     ch_map = {}
     try:
-        for idx, ch in interface.localNode.channels.items():
+        channels = interface.localNode.channels
+        if VERBOSE:
+            print(f"[channel_map] raw channels type={type(channels)}: {channels}")
+        for idx, ch in channels.items():
             name = None
             if isinstance(ch, dict):
                 name = (ch.get("settings") or {}).get("name") or ch.get("name")
             else:
                 name = getattr(getattr(ch, "settings", None), "name", None) or getattr(ch, "name", None)
+            if VERBOSE:
+                print(f"[channel_map] idx={idx} name={name!r} raw={ch}")
             if name:
                 ch_map[int(idx)] = str(name)
-    except Exception:
-        pass
+    except Exception as e:
+        print(f"[channel_map] failed to read channels: {e}")
     return ch_map
 
 def get_gateway_node_id(interface) -> str:
@@ -141,10 +146,19 @@ def get_gateway_node_id(interface) -> str:
     return "unknown"
 
 def channel_matches(packet: dict) -> bool:
-    ch_index = packet.get("channel")
+    # Meshtastic omits the channel field for channel 0 (primary channel)
+    ch_index = packet.get("channel") or 0
+
+    # If we have a channel map with names, use name matching (most reliable)
     if CHANNEL_MAP:
         ch_name = CHANNEL_MAP.get(ch_index)
+        if VERBOSE:
+            print(f"[channel_matches] ch_index={ch_index} ch_name={ch_name!r} target={TARGET_CHANNEL_NAME!r}")
         return ch_name == TARGET_CHANNEL_NAME
+
+    # Fallback: match by index
+    if VERBOSE:
+        print(f"[channel_matches] CHANNEL_MAP empty, falling back to index: ch_index={ch_index} target_index={TARGET_CHANNEL_INDEX}")
     return ch_index == TARGET_CHANNEL_INDEX
 
 def compute_hops(packet: dict):
@@ -424,8 +438,9 @@ def on_receive(packet, interface):
     sender_id_v = packet.get("fromId") or str(packet.get("from", "unknown"))
 
     if VERBOSE:
-        ch_name = CHANNEL_MAP.get(ch_index, f"index={ch_index}")
-        print(f"[verbose] portnum={portnum} | channel={ch_index} ({ch_name}) | from={sender_id_v} | matched={channel_matches(packet)}")
+        ch_index_v = packet.get("channel") or 0
+        ch_name = CHANNEL_MAP.get(ch_index_v, f"index={ch_index_v}")
+        print(f"[verbose] portnum={portnum} | channel={ch_index_v} ({ch_name}) | from={sender_id_v} | matched={channel_matches(packet)}")
 
     # Positionscache
     if portnum == "POSITION_APP":

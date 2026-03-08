@@ -7,9 +7,9 @@ services:
     environment:
       CSV_PATH: /data/nachrichten.csv
       TARGET_CHANNEL_NAME: Feuerwehr
-      TARGET_CHANNEL_INDEX: 1
+      TARGET_CHANNEL_INDEX: 0
       DEBUG_PACKETS: 0
-      VERBOSE: 0
+      VERBOSE: 1
       TELEGRAM_BOT_TOKEN: ${TELEGRAM_BOT_TOKEN}
       TELEGRAM_CHAT_ID: ${TELEGRAM_CHAT_ID}
       MESHTASTIC_DEV: /dev/ttyACM0
