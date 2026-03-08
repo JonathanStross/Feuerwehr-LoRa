@@ -5,21 +5,17 @@ services:
     restart: unless-stopped
 
     environment:
-      CSV_PATH: /data/nachrichten.csv
 
-      TARGET_CHANNEL_NAME: Feuerwehr
-      TARGET_CHANNEL_INDEX: 1
-
-      DEBUG_PACKETS: 0
-
-      TELEGRAM_BOT_TOKEN: ${TELEGRAM_BOT_TOKEN}
-      TELEGRAM_CHAT_ID: ${TELEGRAM_CHAT_ID}
-
-      MESHTASTIC_DEV: /dev/ttyUSB0
-      TZ: Europe/Berlin
-
-      # Healthcheck-Intervall (Sekunden)
-      HEALTHCHECK_INTERVAL_SEC: 3600
+    CSV_PATH: /data/nachrichten.csv
+    TARGET_CHANNEL_NAME: Feuerwehr
+    TARGET_CHANNEL_INDEX: 1
+    DEBUG_PACKETS: 0
+    TELEGRAM_BOT_TOKEN: ${TELEGRAM_BOT_TOKEN}
+    TELEGRAM_CHAT_ID: ${TELEGRAM_CHAT_ID}
+    MESHTASTIC_DEV: /dev/ttyACM0
+    TZ: Europe/Berlin
+    # Healthcheck-Intervall (Sekunden)
+    HEALTHCHECK_INTERVAL_SEC: 3600
 
     volumes:
       - ./data:/data
