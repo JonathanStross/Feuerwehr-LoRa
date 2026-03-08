@@ -25,6 +25,7 @@ TARGET_CHANNEL_INDEX = int(os.getenv("TARGET_CHANNEL_INDEX", "1"))  # bei dir: F
 SERIAL_DEV = os.getenv("MESHTASTIC_DEV", "/dev/ttyUSB0")
 
 DEBUG_PACKETS = os.getenv("DEBUG_PACKETS", "0") == "1"
+VERBOSE = os.getenv("VERBOSE", "0") == "1"  # log every packet summary (portnum, channel, sender)
 
 HEALTHCHECK_INTERVAL_SEC = int(os.getenv("HEALTHCHECK_INTERVAL_SEC", "3600"))
 
@@ -419,6 +420,12 @@ def on_receive(packet, interface):
 
     decoded = packet.get("decoded") or {}
     portnum = decoded.get("portnum")
+    ch_index = packet.get("channel")
+    sender_id_v = packet.get("fromId") or str(packet.get("from", "unknown"))
+
+    if VERBOSE:
+        ch_name = CHANNEL_MAP.get(ch_index, f"index={ch_index}")
+        print(f"[verbose] portnum={portnum} | channel={ch_index} ({ch_name}) | from={sender_id_v} | matched={channel_matches(packet)}")
 
     # Positionscache
     if portnum == "POSITION_APP":
@@ -494,6 +501,38 @@ def on_receive(packet, interface):
 # -----------------------
 # Main
 # -----------------------
+RECONNECT_DELAY_SEC = 10
+
+def connect_and_run():
+    global CHANNEL_MAP, GATEWAY_NODE_ID
+    iface = None
+    try:
+        print(f"[main] Connecting to {SERIAL_DEV} ...")
+        iface = meshtastic.serial_interface.SerialInterface(devPath=SERIAL_DEV)
+
+        CHANNEL_MAP = get_channel_map(iface)
+        GATEWAY_NODE_ID = get_gateway_node_id(iface)
+        print(f"[main] Connected. Channels: {CHANNEL_MAP} | Gateway: {GATEWAY_NODE_ID}")
+
+        # Keep alive – exits only on exception or disconnect
+        while True:
+            time.sleep(5)
+            # Check if the interface is still alive
+            if not getattr(iface, "_connected", True):
+                print("[main] Interface reports disconnected.")
+                break
+
+    except Exception as e:
+        print(f"[main] Connection error: {e}")
+    finally:
+        if iface:
+            try:
+                iface.close()
+            except Exception:
+                pass
+        print(f"[main] Disconnected. Retrying in {RECONNECT_DELAY_SEC}s ...")
+
+
 if __name__ == "__main__":
     ensure_csv_header()
 
@@ -505,17 +544,11 @@ if __name__ == "__main__":
     pub.subscribe(on_receive, "meshtastic.receive")
     pub.subscribe(on_connection, "meshtastic.connection.established")
 
-    # Connect
-    iface = meshtastic.serial_interface.SerialInterface(devPath=SERIAL_DEV)
-
-    # initial channel map + gateway id
-    CHANNEL_MAP = get_channel_map(iface)
-    GATEWAY_NODE_ID = get_gateway_node_id(iface)
-
     # Health loop thread starten (startet sofort mit 1x Healthcheck)
-    t = threading.Thread(target=healthcheck_loop, daemon=True)
-    t.start()
+    health_thread = threading.Thread(target=healthcheck_loop, daemon=True)
+    health_thread.start()
 
-    # keep alive
+    # Main reconnect loop
     while True:
-        time.sleep(60)
+        connect_and_run()
+        time.sleep(RECONNECT_DELAY_SEC)
